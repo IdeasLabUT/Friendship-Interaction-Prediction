@@ -1,9 +1,12 @@
 % Script to import Facebook data from Viswanath et al. (2009)
-% Author: Kevin S. Xu
+% Author: Ruthwik Junuthula and Kevin S. Xu
 
-binSize = 30;   % Size of time bins in days
-wallFile = ['facebook-wall.txt.anon'];
-friendsFile = ['facebook-links.txt.anon'];
+binSize = 90;   % Size of time bins in days
+rawDataPath = '';
+wallFile = [rawDataPath 'facebook-wall.txt'];
+friendsFile = [rawDataPath 'facebook-links.txt'];
+matFilePath = '';
+
 startDate = datenum(2006,9,1);
 endDate = datenum(2009,1,1);
 
@@ -47,8 +50,8 @@ for k = 1:nRowsWall
     if mod(k,100000) == 0
         disp(['Processing entry ' int2str(k)])
     end
-    fromNode = wallData{1}(k);
-    toNode = wallData{2}(k);
+    fromNode = wallData{2}(k);
+    toNode = wallData{1}(k);
     rowDate = wallData{3}(k);
     t = ceil((unixtime2serial(rowDate) - startDate) / binSize);
     if (t > 0) && (t <= tMax) && (fromNode ~= toNode)
@@ -80,8 +83,8 @@ for k = 1:nRowsFriends
     if mod(k,100000) == 0
         disp(['Processing entry ' int2str(k)])
     end
-    fromNode = friendsData{1}(k);
-    toNode = friendsData{2}(k);
+    fromNode = friendsData{2}(k);
+    toNode = friendsData{1}(k);
     rowDate = friendsData{3}{k};
     
     if (fromNode > n) || (toNode > n)
@@ -90,19 +93,23 @@ for k = 1:nRowsFriends
     
     if strcmp(rowDate,'\N')
         % If friendship formation time is unknown, assume it was there
-        % since the star time
+        % since the start time
         tStart = 1;
     else
         rowDateSerial = unixtime2serial(str2double(rowDate));
         tStart = ceil((rowDateSerial - startDate) / binSize);
     end
     
-    % Place friendship edge in all time steps after formation
+    % Place friendship edge in all time steps after formation. Friendship
+    % network is undirected so it is addition of 2 reciprocated edges
+    % corresponding to 2 adjacency matrix entries.
     if (tStart > 0) && (tStart <= tMax)
-        numEdges(tStart:tMax) = numEdges(tStart:tMax)+1;
+        numEdges(tStart:tMax) = numEdges(tStart:tMax)+2;
         for t = tStart:tMax
-            fromNodeArray{t}(numEdges(t)) = fromNode;
-            toNodeArray{t}(numEdges(t)) = toNode;
+            fromNodeArray{t}(numEdges(t)-1) = fromNode;
+            toNodeArray{t}(numEdges(t)-1) = toNode;
+            fromNodeArray{t}(numEdges(t)) = toNode;
+            toNodeArray{t}(numEdges(t)) = fromNode;
         end
     end
 end
@@ -116,5 +123,5 @@ end
 toc
 
 %% Save processed adjacency matrices
-save(['FacebookBothAdj' int2str(binSize) 'Days.mat'],'binSize','adj', ...
-    'frndadj','endDate','startDate','traceEndDate','traceStartDate')
+save([matFilePath 'FacebookBothAdj' int2str(binSize) 'Days.mat'],'binSize', ...
+    'adj','frndadj','endDate','startDate','traceEndDate','traceStartDate')
